@@ -1,0 +1,84 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.3"
+
+    defaultConfig {
+        applicationId "com.chichi.buildconfigvariable"
+        minSdkVersion 21
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    // https://www.tanelikorri.com/tutorial/android/android-signing-config-with-gradle/
+    // Load keystore properties if file exists
+    def keystore_properties = file('../keystore.properties')
+    if (keystore_properties.exists()) {
+        Properties props = new Properties()
+        props.load(new FileInputStream(keystore_properties))
+        props.each { prop ->
+            project.ext.set(prop.key, prop.value)
+        }
+    }
+
+    // Read passwords from Gradle properties and if not found, then from environment variables
+    def keystore_password = project.hasProperty('KEYSTORE_PASSWORD') ? KEYSTORE_PASSWORD : System.getenv("KEYSTORE_PASSWORD")
+    def key_alias = project.hasProperty('KEY_ALIAS') ? KEY_ALIAS : System.getenv("KEY_ALIAS")
+    def key_password = project.hasProperty('KEY_PASSWORD') ? KEY_PASSWORD : System.getenv("KEY_PASSWORD")
+
+    signingConfigs {
+        release {
+            storeFile file('../keystore.jks')
+            storePassword keystore_password
+            keyAlias key_alias
+            keyPassword key_password
+        }
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "BASE_URL", BASE_URL_DEBUG
+        }
+        qa {
+            initWith(debug)
+            buildConfigField "String", "BASE_URL", BASE_URL_QA
+        }
+        release {
+            // Set signing config if keystore variables are set
+            if (keystore_password && key_alias && key_password) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.error("You need to define KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD to enable release signing.")
+            }
+
+            buildConfigField "String", "BASE_URL", BASE_URL_LIVE
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.core:core-ktx:1.3.2'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.3.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+}
